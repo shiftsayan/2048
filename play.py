@@ -1,10 +1,11 @@
 ####################################
-# Imports Function
+# Imports
 ####################################
 
 from tkinter import *
 
 from helper import *
+from ai import *
 
 ####################################
 # Draw Functions
@@ -42,44 +43,24 @@ def draw_board(canvas, data):
             canvas.create_text((x1+x2)/2, (y1+y2)/2, text=text, font=("Open Sans", "55", "bold"), fill=text_color)
 
 ####################################
-# Move Functions
+# Move Function
 ####################################
-
-def move_to_end(board, size, i, j, dx, dy):
-    cur = board[i][j]
-    moves = 0
-
-    while valid_coordinates(i+dy, j+dx, size):
-        if board[i+dy][j+dx] == 0:
-            board[i+dy][j+dx] = board[i][j]
-            board[i][j] = 0
-            i += dy
-            j += dx
-            moves += 1
-        elif board[i+dy][j+dx] == cur:
-            board[i+dy][j+dx] = board[i][j]+1
-            board[i][j] = 0
-            break
-        else:
-            break
-
-    return moves
 
 def move(data, vector):
-    dx, dy = get_direction(vector)
-    moves = 0
+    if not (data.is_won or data.is_lost):
+        if data.is_ai:
+            data.board, result, _ = move_sim(data.board, data.grid, ai(data.board, data.grid, data.target), data.target)
+        elif vector in [ "Left", "Right", "Up", "Down" ]:
+            data.board, result, _ = move_sim(data.board, data.grid, vector, data.target)
 
-    for i in get_range(0, data.grid, dx+dy):
-        for j in get_range(0, data.grid, dx+dy):
-            if data.board[i][j] > 0:
-                moves += move_to_end(data.board, data.grid, i, j, dx, dy)
-
-    if moves > 0:
-        result_check(data)
-        if not (data.is_lost and data.is_won): random_insert(data)
+        if result not in [ True, False ]:
+            pass
+        else:
+            data.is_won, data.is_lost = (True, False) if result else (False, True)
+            data.timerDelay = 1000
 
 ####################################
-# Animation Function
+# Animation Functions
 ####################################
 
 def init(data):
@@ -117,23 +98,22 @@ def init(data):
                         rgb2hex(237, 194,  46)  # 2048
                       ]
 
-    # Results
+    # Win States
     data.is_lost = False
     data.is_won  = False
 
     # Randomly Insert Two 2-tiles
     for i in range(data.start_tiles):
-        random_insert(data)
+        data.board = random_insert(data.board, data.grid)
 
 def mousePressed(event, data):
     pass
 
 def keyPressed(event, data):
-    if not (data.is_won or data.is_lost):
-        if event.keysym in [ "Left", "Right", "Up", "Down" ]: move(data, event.keysym)
+    if not data.is_ai: move(data, event.keysym)
 
 def timerFired(data):
-    pass
+    if data.is_ai: move(data, "")
 
 def redrawAll(canvas, data):
     if data.is_won: draw_win(canvas, data)
@@ -145,7 +125,7 @@ def redrawAll(canvas, data):
 # Source: www.cs.cmu.edu/~112
 ####################################
 
-def run(width=600, height=600):
+def run(mode, width=600, height=600):
     def redrawAllWrapper(canvas, data):
         canvas.delete(ALL)
         canvas.create_rectangle(0, 0, data.width, data.height,
@@ -164,32 +144,29 @@ def run(width=600, height=600):
     def timerFiredWrapper(canvas, data):
         timerFired(data)
         redrawAllWrapper(canvas, data)
-        # Pause, then call timerFired again
         canvas.after(data.timerDelay, timerFiredWrapper, canvas, data)
 
-    # Set up data and call init
     class Struct(object): pass
     data = Struct()
+    data.is_ai  = True if mode[0].upper() == 'S' else False # Simulate
     data.width  = width
     data.height = height
-    data.timerDelay = 100 # milliseconds
+    data.timerDelay = 200 # milliseconds
     root = Tk()
     init(data)
 
-    # Create the root and the canvas
     canvas = Canvas(root, width=data.width, height=data.height)
     canvas.pack()
 
-    # Set up events
+    root.title("2048")
     root.bind("<Button-1>", lambda event:
                             mousePressedWrapper(event, canvas, data))
     root.bind("<Key>", lambda event:
                             keyPressedWrapper(event, canvas, data))
     timerFiredWrapper(canvas, data)
 
-    # Launch the app
     root.mainloop()
 
-
 if __name__ == '__main__':
-    run()
+    mode = raw_input("Play or Simulate: ")
+    run(mode)
